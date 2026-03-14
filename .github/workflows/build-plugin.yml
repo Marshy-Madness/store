@@ -137,8 +137,7 @@ jobs:
       github.event_name == 'push' &&
       github.ref == 'refs/heads/main' &&
       needs.find-plugins.outputs.plugins != '[]' &&
-      needs.find-plugins.outputs.plugins != '' &&
-      secrets.RELEASE_TOKEN != ''
+      needs.find-plugins.outputs.plugins != ''
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
