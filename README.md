@@ -56,7 +56,8 @@ The repo includes a **GitHub Actions** workflow that builds plugin zips the same
    - `pnpm i --frozen-lockfile` (or `pnpm i` if no lockfile)
    - `pnpm run build`
    - Creates a zip excluding `src/`, `node_modules/`, `__pycache__/` (and similar), named from `plugin.json` → `name` (e.g. `zipline-uploader.zip`).
-   - Uploads the zip as a workflow artifact.
+   - Uploads the zip as a workflow artifact named after the plugin folder (e.g. **`zipline-auto-uploader`**).
+   - **On push to `main`:** If the secret **`RELEASE_TOKEN`** is set (a GitHub PAT with `repo` scope), the workflow also creates a GitHub Release in the plugin’s own repo (the submodule), tagged from `package.json` version (e.g. `v1.0.0`) and attaches the built zip. Add `RELEASE_TOKEN` under Settings → Secrets and variables → Actions to enable this.
 
 2. **Optional – Docker builder:** The `builder/` folder contains the same Dockerfile and `entrypoint.sh` as the official database. To build a plugin locally with it:
    - Mount the plugin dir at `/plugin` and a writeable dir at `/out`.

@@ -122,9 +122,67 @@ jobs:
             -x ".github/*" \
             -x ".vscode/*" \
             -x "*.map"
+          cp "${{ github.workspace }}/$ZIP_NAME" "${{ github.workspace }}/${{ matrix.plugin }}.zip"
 
       - name: Upload plugin zip
         uses: actions/upload-artifact@v4
         with:
-          name: plugin-${{ matrix.plugin }}-${{ steps.zipname.outputs.name }}
-          path: ${{ github.workspace }}/${{ steps.zipname.outputs.name }}.zip
+          name: ${{ matrix.plugin }}
+          path: ${{ github.workspace }}/${{ matrix.plugin }}.zip
+
+  release:
+    name: Release ${{ matrix.plugin }}
+    needs: [find-plugins, build]
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      needs.find-plugins.outputs.plugins != '[]' &&
+      needs.find-plugins.outputs.plugins != '' &&
+      secrets.RELEASE_TOKEN != ''
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJson(needs.find-plugins.outputs.plugins) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Get plugin repo (owner/repo)
+        id: repo
+        run: |
+          cd "${{ env.PLUGIN_ROOT }}/${{ matrix.plugin }}"
+          URL=$(git remote get-url origin 2>/dev/null || true)
+          if [ -z "$URL" ]; then
+            echo "Could not get submodule remote URL" >&2
+            exit 1
+          fi
+          # Parse https://github.com/owner/repo.git or git@github.com:owner/repo.git -> owner/repo
+          REPO=$(echo "$URL" | sed -E 's|^https://github\.com/||; s|^git@github\.com:||; s|\.git$||')
+          echo "repository=$REPO" >> $GITHUB_OUTPUT
+
+      - name: Get plugin version
+        id: version
+        run: |
+          V=$(jq -r '.version' "${{ env.PLUGIN_ROOT }}/${{ matrix.plugin }}/package.json")
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "tag=v$V" >> $GITHUB_OUTPUT
+
+      - name: Download plugin zip
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.plugin }}
+
+      - name: Create GitHub Release in plugin repo
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: ${{ steps.repo.outputs.repository }}
+          token: ${{ secrets.RELEASE_TOKEN }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          files: ${{ matrix.plugin }}.zip
+          generate_release_notes: true
